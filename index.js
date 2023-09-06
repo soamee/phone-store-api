@@ -3,10 +3,37 @@ const sqlite3 = require("sqlite3");
 const bodyParser = require("body-parser");
 
 const app = express();
+
+const swaggerJSDoc = require("swagger-jsdoc");
+const swaggerUi = require("swagger-ui-express");
+
+const swaggerDefinition = {
+  openapi: "3.0.0",
+  info: {
+    title: "Phone Store API",
+    version: "1.0.0",
+    description: "API for a simple phone store",
+  },
+  servers: [
+    {
+      url: "phones-store-api.containers.soamee.com",
+      description: "Soamee server",
+    },
+  ],
+};
+
+const options = {
+  swaggerDefinition,
+  apis: ["./index.js"], // point this to your API files
+};
+
 const port = process.env.PORT || 3000;
 
 const db = new sqlite3.Database(":memory:");
 
+const swaggerSpec = swaggerJSDoc(options);
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Middleware
 app.use(bodyParser.json());
 
@@ -76,6 +103,38 @@ db.serialize(() => {
 });
 
 // CRUD: Read all phones
+/**
+ * @swagger
+ * /phones:
+ *  get:
+ *    summary: Retrieve a list of phones.
+ *    tags: [Phones]
+ *    responses:
+ *      200:
+ *        description: A list of phones.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: array
+ *              items:
+ *                $ref: '#/components/schemas/Phone'
+ *
+ * components:
+ *  schemas:
+ *    Phone:
+ *      type: object
+ *      properties:
+ *        id:
+ *          type: integer
+ *        name:
+ *          type: string
+ *        photoUrl:
+ *          type: string
+ *        price:
+ *          type: number
+ *        description:
+ *          type: string
+ */
 app.get("/phones", (req, res) => {
   db.all("SELECT * FROM phones", [], (err, phones) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -104,6 +163,28 @@ app.get("/phones", (req, res) => {
 });
 
 // CRUD: Create
+/**
+ * @swagger
+ * /phones:
+ *  post:
+ *    summary: Add a new phone.
+ *    tags: [Phones]
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            $ref: '#/components/schemas/PhoneWithoutID'
+ *    responses:
+ *      200:
+ *        description: Phone added successfully.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/Phone'
+ *      500:
+ *        description: Server error.
+ */
 app.post("/phones", (req, res) => {
   const { name, photoUrl, price, description } = req.body;
   const stmt = db.prepare(
@@ -117,6 +198,31 @@ app.post("/phones", (req, res) => {
 });
 
 // CRUD: Read
+/**
+ * @swagger
+ * /phone/{id}:
+ *  get:
+ *    summary: Retrieve a specific phone by ID.
+ *    tags: [Phones]
+ *    parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: integer
+ *        required: true
+ *        description: ID of the phone to retrieve.
+ *    responses:
+ *      200:
+ *        description: A single phone.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/Phone'
+ *      404:
+ *        description: Phone not found.
+ *      500:
+ *        description: Server error.
+ */
 app.get("/phones/:id", (req, res) => {
   const { id } = req.params;
   db.get("SELECT * FROM phones WHERE id = ?", [id], (err, phone) => {
@@ -139,6 +245,37 @@ app.get("/phones/:id", (req, res) => {
 });
 
 // CRUD: Update
+/**
+ * @swagger
+ * /phone/{id}:
+ *  put:
+ *    summary: Update a specific phone by ID.
+ *    tags: [Phones]
+ *    parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: integer
+ *        required: true
+ *        description: ID of the phone to update.
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            $ref: '#/components/schemas/PhoneWithoutID'
+ *    responses:
+ *      200:
+ *        description: Phone updated successfully.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/Phone'
+ *      404:
+ *        description: Phone not found.
+ *      500:
+ *        description: Server error.
+ */
 app.put("/phones/:id", (req, res) => {
   const { id } = req.params;
   const { name, photoUrl, price, description } = req.body;
@@ -153,6 +290,27 @@ app.put("/phones/:id", (req, res) => {
 });
 
 // CRUD: Delete
+/**
+ * @swagger
+ * /phone/{id}:
+ *  delete:
+ *    summary: Delete a specific phone by ID.
+ *    tags: [Phones]
+ *    parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: integer
+ *        required: true
+ *        description: ID of the phone to delete.
+ *    responses:
+ *      200:
+ *        description: Phone deleted successfully.
+ *      404:
+ *        description: Phone not found.
+ *      500:
+ *        description: Server error.
+ */
 app.delete("/phones/:id", (req, res) => {
   const { id } = req.params;
   db.run("DELETE FROM phones WHERE id = ?", [id], (err) => {
@@ -162,6 +320,37 @@ app.delete("/phones/:id", (req, res) => {
 });
 
 // Toggle as Favorite
+/**
+ * @swagger
+ * /phone/{id}/favorite:
+ *  post:
+ *    summary: Toggle a phone as favorite for a user.
+ *    tags: [Phones]
+ *    parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: integer
+ *        required: true
+ *        description: ID of the phone to toggle as favorite.
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            properties:
+ *              username:
+ *                type: string
+ *                description: Username of the user marking the phone as favorite.
+ *    responses:
+ *      200:
+ *        description: Phone marked as favorite successfully.
+ *      404:
+ *        description: Phone not found.
+ *      500:
+ *        description: Server error.
+ */
 app.put("/phones/:id/favorite", (req, res) => {
   const { id } = req.params;
   const username = req.headers.username;
@@ -194,6 +383,41 @@ app.put("/phones/:id/favorite", (req, res) => {
 });
 
 // Buy a Phone
+/**
+ * @swagger
+ * /phone/{id}/buy:
+ *  post:
+ *    summary: Purchase a specific phone by ID.
+ *    tags: [Purchases]
+ *    parameters:
+ *      - in: path
+ *        name: id
+ *        schema:
+ *          type: integer
+ *        required: true
+ *        description: ID of the phone to buy.
+ *    requestBody:
+ *      required: true
+ *      content:
+ *        application/json:
+ *          schema:
+ *            type: object
+ *            properties:
+ *              username:
+ *                type: string
+ *                description: Username of the user buying the phone.
+ *    responses:
+ *      200:
+ *        description: Phone purchased successfully.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              $ref: '#/components/schemas/Purchase'
+ *      404:
+ *        description: Phone not found.
+ *      500:
+ *        description: Server error.
+ */
 app.post("/phones/:id/buy", (req, res) => {
   const { id } = req.params;
   const username = req.headers.username;
@@ -208,22 +432,86 @@ app.post("/phones/:id/buy", (req, res) => {
 });
 
 // GET purchases
+/**
+ * @swagger
+ * /purchases:
+ *  get:
+ *    summary: Retrieve a list of all phone purchases.
+ *    tags: [Purchases]
+ *    responses:
+ *      200:
+ *        description: A list of phone purchases.
+ *        content:
+ *          application/json:
+ *            schema:
+ *              type: array
+ *              items:
+ *                $ref: '#/components/schemas/PurchaseDetails'
+ *      500:
+ *        description: Server error.
+ */
 app.get("/purchases", (req, res) => {
-  db.all(
-    "SELECT phones.name as phoneName, purchases.username FROM purchases JOIN phones ON purchases.phoneId = phones.id",
-    [],
-    (err, rows) => {
-      if (err) return res.status(500).json({ error: err.message });
+  const sql = `SELECT phones.id as phoneId, phones.name, phones.photoUrl, phones.price, phones.description, purchases.username 
+                 FROM purchases
+                 JOIN phones ON purchases.phoneId = phones.id`;
 
-      const purchases = rows.map((row) => ({
-        phoneName: row.phoneName,
-        boughtBy: row.username,
-      }));
-
-      res.json(purchases);
+  db.all(sql, [], (err, rows) => {
+    if (err) {
+      res.status(500).json({ error: err.message });
+      return;
     }
-  );
+
+    const purchases = rows.map((row) => ({
+      id: row.purchaseId,
+      phone: {
+        id: row.phoneId,
+        name: row.name,
+        photoUrl: row.photoUrl,
+        price: row.price,
+        description: row.description,
+      },
+      username: row.username,
+    }));
+
+    res.json(purchases);
+  });
 });
+
+/**
+ * @swagger
+ * components:
+ *  schemas:
+ *    Purchase:
+ *      type: object
+ *      properties:
+ *        id:
+ *          type: integer
+ *          description: ID of the purchase.
+ *        phoneId:
+ *          type: integer
+ *          description: ID of the purchased phone.
+ *        username:
+ *          type: string
+ *          description: Username of the user who bought the phone.
+ */
+
+// Note: We need a new schema 'PurchaseDetails' to represent the detailed purchase data:
+/**
+ * @swagger
+ * components:
+ *  schemas:
+ *    PurchaseDetails:
+ *      type: object
+ *      properties:
+ *        id:
+ *          type: integer
+ *          description: ID of the purchase.
+ *        phone:
+ *          $ref: '#/components/schemas/Phone'
+ *        username:
+ *          type: string
+ *          description: Username of the user who bought the phone.
+ */
 
 app.listen(port, () => {
   console.log(`Server started on http://localhost:${port}`);
