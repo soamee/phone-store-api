@@ -1,8 +1,11 @@
 const express = require("express");
 const sqlite3 = require("sqlite3");
 const bodyParser = require("body-parser");
+const cors = require("cors");
 
 const app = express();
+
+app.use(cors());
 
 const swaggerJSDoc = require("swagger-jsdoc");
 const swaggerUi = require("swagger-ui-express");
